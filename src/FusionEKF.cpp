@@ -22,31 +22,16 @@ FusionEKF::FusionEKF() {
   H_laser_ = MatrixXd(2, 4);
   Hj_ = MatrixXd(3, 4);
 
+  H_laser_ << 1.0, 0.0, 0.0, 0.0,
+	  0.0, 1.0, 0.0, 0.0;
+
   //measurement covariance matrix - laser
-  R_laser_ << 0.0225, 0,
-        0, 0.0225;
+  R_laser_ << 0.0225, 0, 0, 0.0225;
 
   //measurement covariance matrix - radar
   R_radar_ << 0.09, 0, 0,
         0, 0.0009, 0,
         0, 0, 0.09;
-
-  /**
-  TODO:
-    * Finish initializing the FusionEKF.
-    * Set the process and measurement noises
-  */
-  VectorXd x_in = VectorXd(4);
-  MatrixXd F_ = MatrixXd(4, 4);
-  MatrixXd P_ = MatrixXd(4, 4);
-  MatrixXd Q_ = MatrixXd(4, 4);
-
-  P_ << 1, 0, 1, 0,
-	  0, 1, 0, 1,
-	  0, 0, 1000, 0,
-	  0, 0, 0, 1000;
-
-  ekf_.Init(x_in, P_, F_, H_laser_, R_laser_, Q_);
 }
 
 /**
@@ -68,7 +53,7 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
       * Remember: you'll need to convert radar from polar to cartesian coordinates.
     */
     // first measurement
-    cout << "EKF: " << endl;
+    cout << "EKF: initialize" << endl;
     ekf_.x_ = VectorXd(4);
     ekf_.x_ << 1, 1, 1, 1;
 
@@ -77,8 +62,9 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
       Convert radar from polar to cartesian coordinates and initialize state.
       */
 		cout << "Start RADAR measurement" << endl;
-		double rho = measurement_pack.raw_measurements_[0]; // range
+		double rho = measurement_pack.raw_measurements_[0]; // Radial distance 
 		double phi = measurement_pack.raw_measurements_[1]; // bearing
+		double rho_dot = measurement_pack.raw_measurements_[2]; // Radial Velocity
 		double px = rho * cos(phi);
 		double py = rho * sin(phi);
 
@@ -97,13 +83,24 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
       Initialize state.
       */
 		cout << "Start Laser measurement" << endl;
-      ekf_.x_ << measurement_pack.raw_measurements_[0], measurement_pack.raw_measurements_[1], 0, 0;
+        ekf_.x_ << measurement_pack.raw_measurements_[0], measurement_pack.raw_measurements_[1], 0, 0;
     }
 
-    // done initializing, no need to predict or update
+	ekf_.P_ << 1.0, 0.0, 0.0, 0.0,
+		0.0, 1.0, 0.0, 0.0,
+		0.0, 0.0, 1000.0, 0.0,
+		0.0, 0.0, 0.0, 1000.0;
 
-	cout << "Initialization Done" << endl;
-    is_initialized_ = true;
+	ekf_.F_ << 1.0, 0.0, 1.0, 0.0,
+		0.0, 1.0, 0.0, 1.0,
+		0.0, 0.0, 1.0, 0.0,
+		0.0, 0.0, 0.0, 1.0;
+
+	ekf_.Q_ = MatrixXd(4, 4);
+
+	cout << "Initialization on (P,F,Q,x) Done" << endl;
+
+	is_initialized_ = true;
 	previous_timestamp_ = measurement_pack.timestamp_;
     return;
   }
@@ -119,30 +116,37 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
      * Update the process noise covariance matrix.
      * Use noise_ax = 9 and noise_ay = 9 for your Q matrix.
    */
-  float noise_ax = 9.0;
-  float noise_ay = 9.0;
+
 
   float dt = (measurement_pack.timestamp_ - previous_timestamp_) / 1000000.0;
-  float dt_2 = dt * dt;
-  float dt_3 = dt_2 * dt;
-  float dt_4 = dt_3 * dt;
+  if (dt >= 0.005f){
+	  float noise_ax = 9.0;
+	  float noise_ay = 9.0;
 
-  previous_timestamp_ = measurement_pack.timestamp_;
+	  float dt_2 = dt * dt;
+	  float dt_3 = dt_2 * dt;
+	  float dt_4 = dt_3 * dt;
 
-  ekf_.F_(0, 2) = dt;
-  ekf_.F_(1, 3) = dt;
+	  previous_timestamp_ = measurement_pack.timestamp_;
 
-  ekf_.Q_ = MatrixXd(4, 4);
-  ekf_.Q_ << dt_4 / 4 * noise_ax, 0, dt_3 / 2 * noise_ax, 0,
-	  0, dt_4 / 4 * noise_ay, 0, dt_3 / 2 * noise_ay,
-	  dt_3 / 2 * noise_ax, 0, dt_2*noise_ax, 0,
-	  0, dt_3 / 2 * noise_ay, 0, dt_2*noise_ay;
+	  ekf_.F_(0, 2) = dt;
+	  ekf_.F_(1, 3) = dt;
 
-  cout << "Q_ = " << ekf_.Q_ << endl;
+	  ekf_.Q_ = MatrixXd(4, 4);
+	  ekf_.Q_ << dt_4 / 4 * noise_ax, 0, dt_3 / 2 * noise_ax, 0,
+		  0, dt_4 / 4 * noise_ay, 0, dt_3 / 2 * noise_ay,
+		  dt_3 / 2 * noise_ax, 0, dt_2*noise_ax, 0,
+		  0, dt_3 / 2 * noise_ay, 0, dt_2*noise_ay;
 
-  ekf_.Predict();
+	  cout << "Q_ = " << ekf_.Q_ << endl;
 
-  cout << "Done Predict" << endl;
+	  ekf_.Predict();
+
+	  cout << "Done Predict" << endl;
+  }
+  else {
+	  cout << "Measurment too close, skip prediction" << endl;
+  }
   /*****************************************************************************
    *  Update
    ****************************************************************************/
