@@ -84,7 +84,13 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
       */
 		cout << "Start Laser measurement" << endl;
         ekf_.x_ << measurement_pack.raw_measurements_[0], measurement_pack.raw_measurements_[1], 0, 0;
+		cout << "End Laser measurement" << endl;
     }
+
+
+	ekf_.Q_ = MatrixXd(4, 4);
+	ekf_.P_ = MatrixXd(4, 4);
+	ekf_.F_ = MatrixXd(4, 4);
 
 	ekf_.P_ << 1.0, 0.0, 0.0, 0.0,
 		0.0, 1.0, 0.0, 0.0,
@@ -96,7 +102,6 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
 		0.0, 0.0, 1.0, 0.0,
 		0.0, 0.0, 0.0, 1.0;
 
-	ekf_.Q_ = MatrixXd(4, 4);
 
 	cout << "Initialization on (P,F,Q,x) Done" << endl;
 
