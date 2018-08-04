@@ -50,25 +50,38 @@ void KalmanFilter::Update(const VectorXd &z) {
 	P_ = (I - k * H_)*P_;
 }
 
+VectorXd KalmanFilter::PredictRadarMeasurement(const VectorXd& x) const
+{
+	VectorXd result(3);
+	const float px = x(0, 0);
+	const float py = x(1, 0);
+	const float vx = x(2, 0);
+	const float vy = x(3, 0);
+	const float eps = 1e-8;
+	const float rho = sqrt(px * px + py * py);
+	const float phi = atan2(py, px);
+	const float rho_dot = (px * vx + py * vy) / (eps + rho);
+	result << rho, phi, rho_dot;
+	return result;
+}
+
 void KalmanFilter::UpdateEKF(const VectorXd &z) {
   /**
   TODO:
     * update the state by using Extended Kalman Filter equations
   */
-	VectorXd z_pred = H_ * x_;
+	VectorXd z_pred = PredictRadarMeasurement(x_);
 	VectorXd y = z - z_pred;
 
 
-	//angle normalization
-	while (y(1) > M_PI || y(1) < -M_PI) {
-		if (y(1) > M_PI) {
-			y(1) -= M_PI;
+	while (y[1] > M_PI || y[1] < -M_PI) {
+		if (y[1] > M_PI) {
+			y[1] = y[1] - 2 * M_PI;
 		}
-		else {
-			y(1) += M_PI;
+		else if (y[1] < -M_PI) {
+			y[1] = y[1] + 2 * M_PI;
 		}
 	}
-
 
 	MatrixXd Ht = H_.transpose();
 	MatrixXd S = H_ * P_*Ht + R_;
@@ -76,9 +89,11 @@ void KalmanFilter::UpdateEKF(const VectorXd &z) {
 	MatrixXd Si = S.inverse();
 	MatrixXd PHt = P_ * Ht;
 	MatrixXd k = PHt * Si;
-	x_ = x_ + (k*y);
 
 	long xsize = x_.size();
 	MatrixXd I = MatrixXd::Identity(xsize, xsize);
+
+	x_ = x_ + (k*y);
+
 	P_ = (I - k * H_)*P_;
 }

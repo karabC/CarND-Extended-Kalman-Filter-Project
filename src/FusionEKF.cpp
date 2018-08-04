@@ -64,10 +64,11 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
 		cout << "Start RADAR measurement" << endl;
 		double rho = measurement_pack.raw_measurements_[0]; // Radial distance 
 		double phi = measurement_pack.raw_measurements_[1]; // bearing
-		double rho_dot = measurement_pack.raw_measurements_[2]; // Radial Velocity
+		//double rho_dot = measurement_pack.raw_measurements_[2]; // Radial Velocity
 		double px = rho * cos(phi);
 		double py = rho * sin(phi);
 
+		/*
 		if (px < 0.0001) {
 			px = 0.0001;
 		}
@@ -75,6 +76,7 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
 		if (py < 0.0001) {
 			py = 0.0001;
 		}
+		*/
 
 		ekf_.x_ << px, py, 0, 0;
     }
